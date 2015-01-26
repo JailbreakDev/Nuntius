@@ -6,3 +6,8 @@
 -(int)pidForApplication:(id)arg1 ;
 -(void)setBadgeValue:(id)arg1 forBundleID:(id)arg2 ;
 @end
+
+@interface FBProcessManager : NSObject
++(id)sharedInstance;
+-(id)createApplicationProcessForBundleID:(id)arg1 ;
+@end

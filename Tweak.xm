@@ -1,4 +1,6 @@
 #import "Headers.h"
+#import "FrontBoard.h"
+#import "AssertionDaemon.h"
 #include <notify.h>
 
 @interface SBApplication : NSObject
@@ -6,11 +8,16 @@
 -(void)resumeToQuit;
 -(void)resumeForContentAvailable;
 -(void)setBadge:(id)arg1 ;
+-(unsigned)applicationState;
 @end
 
 @interface SBApplicationController : NSObject
 +(id)sharedInstance;
 -(SBApplication *)applicationWithPid:(NSInteger)pid;
+@end
+
+@interface UIApplication(ActivateSuspended)
+-(BOOL)launchApplicationWithIdentifier:(id)identifier suspended:(BOOL)s;
 @end
 
 %group SpringBoardHooks
@@ -20,6 +27,11 @@
 	NSLog(@"Bulletin: %@",bulletin);
 	
 	if (bulletin.sectionID && [bulletin.sectionID isEqualToString:@"net.whatsapp.WhatsApp"]) { //check for whatsapp
+
+		//activate app
+		[[UIApplication sharedApplication] launchApplicationWithIdentifier:@"net.whatsapp.WhatsApp" suspended:YES];
+		[[objc_getClass("FBProcessManager") sharedInstance] createApplicationProcessForBundleID:@"net.whatsapp.WhatsApp"];
+
 		//section parameters
 		BBObserver *observer = bulletin.firstValidObserver;
 		BBSectionParameters *parameters = [observer parametersForSectionID:bulletin.sectionID];
@@ -95,9 +107,9 @@
 %end
 %hook SBLockScreenActionContextFactory
 
--(id)lockScreenActionContextForBulletin:(BBBulletin *)bulletin action:(id)arg2 origin:(int)arg3 pluginActionsAllowed:(BOOL)arg4 context:(id)arg5 completion:(/*^block*/id)arg6 {
+-(id)lockScreenActionContextForBulletin:(BBBulletin *)bulletin action:(BBAction *)action origin:(int)arg3 pluginActionsAllowed:(BOOL)arg4 context:(id)arg5 completion:(/*^block*/id)arg6 {
 	SBMutableLockScreenActionContext *ctx = %orig;
-	if ([bulletin.sectionID isEqualToString:@"net.whatsapp.WhatsApp"]) {
+	if ([bulletin.sectionID isEqualToString:@"net.whatsapp.WhatsApp"] && [action.identifier isEqualToString:@"NuntiusWhatsAppQuickReplyAction"]) {
 		[ctx setRequiresUIUnlock:NO];
 	}
 
@@ -108,16 +120,27 @@
 %end
 
 void nt_initializeSpringBoard() {
+	
+	__block BKSProcessAssertion *assertion = nil;
+
 	static int activationToken = 0;
 	notify_register_dispatch("com.sharedroutine.nuntius.activate", &activationToken, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(int token) {
 		uint64_t pid = -1;
 		notify_get_state(token,&pid);
 		SBApplication *app = [[%c(SBApplicationController) sharedInstance] applicationWithPid:pid];
 		if (app) {
-			dispatch_async(dispatch_get_main_queue(),^{
-				[app setBadge:@""];
+			if (assertion) {
+				 [assertion invalidate];
+				 assertion = nil;
+			}
+			assertion = [[%c(BKSProcessAssertion) alloc] initWithPID:pid flags:0x7 reason:10006 name:@"nuntius_activate" withHandler:nil];
+
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 25.0f * NSEC_PER_SEC),dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0),^{
+				if (assertion) {
+					[assertion invalidate];
+				 	assertion = nil;
+				}
 			});
-			[app resumeForContentAvailable];
 		}
     });
 }
@@ -127,5 +150,5 @@ void nt_initializeSpringBoard() {
 	if ([processName isEqualToString:@"SpringBoard"]) {
 		nt_initializeSpringBoard();
 		%init(SpringBoardHooks);
-	}
+	} 
 }

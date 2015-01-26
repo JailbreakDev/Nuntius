@@ -131,3 +131,17 @@
 @interface _UITableViewCellActionButton : UIButton
 +(id)actionButtonWithStyle:(unsigned long long)arg1 ;
 @end
+
+@interface BKSProcessAssertion : NSObject 
+@property (nonatomic,copy) NSString * name; 
+@property (assign,nonatomic) unsigned flags; 
+@property (nonatomic,readonly) unsigned reason; 
+@property (nonatomic,readonly) BOOL valid; 
+@property (nonatomic,copy) id invalidationHandler; 
+@property (readonly) unsigned long long hash; 
+@property (readonly) Class superclass; 
+@property (copy,readonly) NSString * description; 
+@property (copy,readonly) NSString * debugDescription; 
+-(id)initWithPID:(int)arg1 flags:(unsigned)arg2 reason:(unsigned)arg3 name:(id)arg4 withHandler:(/*^block*/id)arg5 ;
+-(void)invalidate;
+@end

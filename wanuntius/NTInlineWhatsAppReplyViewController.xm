@@ -4,10 +4,6 @@
 #import "../FrontBoard.h"
 #include <notify.h>
 
-@interface UIApplication(ActivateSuspended)
--(BOOL)launchApplicationWithIdentifier:(id)identifier suspended:(BOOL)s;
-@end
-
 int activate = 0;
 
 @interface CKInlineReplyViewController : NCInteractiveNotificationViewController
@@ -17,6 +13,16 @@ int activate = 0;
 
 %group NotificationHooks
 %subclass NTInlineWhatsAppReplyViewController : CKInlineReplyViewController
+
+-(id)init {
+	self = %orig;
+
+	if (self) {
+		notify_register_check("com.sharedroutine.nuntius.activate",&activate);
+	}
+
+	return self;
+}
 
 -(CKMessageEntryView *)entryView {
 	CKMessageEntryView *entry = %orig;
@@ -28,9 +34,11 @@ int activate = 0;
 	[[[self entryView] sendButton] setEnabled:[[[self entryView] composition] hasContent]];
 }
 
--(void)interactiveNotificationDidAppear {
+-(void)messageEntryViewDidBeginEditing:(id)msgView {
 	%orig;
-	[self activateApplication];
+	int pid = [[%c(FBSSystemService) sharedService] pidForApplication:@"net.whatsapp.WhatsApp"];
+	notify_set_state(activate,(uint64_t)pid);
+	notify_post("com.sharedroutine.nuntius.activate");
 }
 
 -(void)messageEntryViewSendButtonHit:(id)btn {
@@ -40,29 +48,6 @@ int activate = 0;
 		[[NSDistributedNotificationCenter defaultCenter] postNotificationName:@"com.sharedroutine.nuntius.whatsapp.notification" object:nil userInfo:@{@"kMessage":messageText,@"kJID":JID}];
 	}
 	[self dismissWithContext:nil];
-}
-
-%new
-
--(void)activateApplication {
-	notify_register_check("com.sharedroutine.nuntius.activate",&activate);
-	int pid = [[%c(FBSSystemService) sharedService] pidForApplication:@"net.whatsapp.WhatsApp"];
-	BOOL running = (pid != 0);
-	if (!running) {
-		[[UIApplication sharedApplication] launchApplicationWithIdentifier:@"net.whatsapp.WhatsApp" suspended:YES];
-
-		static int launchToken = 0;
-		notify_register_dispatch("net.whatsapp.WhatsApp-launched", &launchToken, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(int token) {
-			int pid = [[%c(FBSSystemService) sharedService] pidForApplication:@"net.whatsapp.WhatsApp"];
-			notify_set_state(activate,(uint64_t)pid);
-			notify_post("com.sharedroutine.nuntius.activate");
-	    });
-
-	} else {
-		int pid = [[%c(FBSSystemService) sharedService] pidForApplication:@"net.whatsapp.WhatsApp"];
-		notify_set_state(activate,(uint64_t)pid);
-		notify_post("com.sharedroutine.nuntius.activate");
-	}
 }
 
 %end

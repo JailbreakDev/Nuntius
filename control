@@ -3,7 +3,7 @@ Name: Nuntius
 Depends: mobilesubstrate
 Version: 0.0.1
 Architecture: iphoneos-arm
-Description: An awesome MobileSubstrate tweak!
+Description: WhatsApp QR and more...
 Maintainer: sharedRoutine
 Author: sharedRoutine
 Section: Tweaks
